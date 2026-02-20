@@ -1,0 +1,5 @@
+<launch>
+	<node name="master" pkg="master" type="master" output="screen" />
+	<node name="keyboard" pkg="keyboard" type="keyboard" output="screen" />
+    <node name="mobile_ik" pkg="mobile_ik" type="mobile_ik" output="screen"/>
+</launch>
