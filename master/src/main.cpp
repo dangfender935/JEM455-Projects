@@ -36,54 +36,29 @@ void keydown_callback(const keyboard::Key& msg)
     ROS. Here we are just printing the code for the key that was pressed.*/
     switch (message_in.code)
     {
-    case Q_KEY:
-        message_out.x = LINEAR_SPEED;
-        message_out.z = ANGULAR_SPEED;
-        break;
-
     case W_KEY:
         message_out.x = LINEAR_SPEED;
-        message_out.z = 0;
-        break;
-
-    case E_KEY:
-        message_out.x = LINEAR_SPEED;
-        message_out.z = -ANGULAR_SPEED;
+        // message_out.z = 0;
         break;
 
     case A_KEY:
-        message_out.x = 0;
+        // message_out.x = 0;
         message_out.z = ANGULAR_SPEED;
         break;
 
     case S_KEY:
-        message_out.x = 0;
-        message_out.z = 0;
+        message_out.x = -LINEAR_SPEED;
+        // message_out.z = 0;
         break;
 
     case D_KEY:
-        message_out.x = 0;
-        message_out.z = -ANGULAR_SPEED;
-        break;
-
-    case Z_KEY:
-        message_out.x = -LINEAR_SPEED;
-        message_out.z = ANGULAR_SPEED;
-        break;
-
-    case X_KEY:
-        message_out.x = -LINEAR_SPEED;
-        message_out.z = 0;
-        break;
-
-    case C_KEY:
-        message_out.x = -LINEAR_SPEED;
+        // message_out.x = 0;
         message_out.z = -ANGULAR_SPEED;
         break;
 
     default:
-        // message_out.x = 0;
-        // message_out.z = 0;
+        message_out.x = 0;
+        message_out.z = 0;
         break;
     
     }
