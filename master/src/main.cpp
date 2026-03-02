@@ -14,7 +14,7 @@
 #define Z_KEY           (122)
 #define X_KEY           (120)
 #define C_KEY           (99)
-#define LINEAR_SPEED    (1)
+#define LINEAR_SPEED    (2)
 #define ANGULAR_SPEED   (1)
 
 // Global variables
@@ -23,6 +23,8 @@ keyboard::Key message_in; // This will hold the message from the topic we subscr
 geometry_msgs::Vector3 message_out;
 ros::Publisher my_publisher_object;
 ros::Subscriber keydown_in;
+ros::Subscriber keyup_in;
+ros::Time last_key_time;
 
 
 /* This is our callback function that is called when something is published to the keyboard/keydown
@@ -37,23 +39,23 @@ void keydown_callback(const keyboard::Key& msg)
     switch (message_in.code)
     {
     case W_KEY:
-        message_out.x = LINEAR_SPEED;
+        message_out.x += LINEAR_SPEED;
         // message_out.z = 0;
         break;
 
     case A_KEY:
         // message_out.x = 0;
-        message_out.z = ANGULAR_SPEED;
+        message_out.z += ANGULAR_SPEED;
         break;
 
     case S_KEY:
-        message_out.x = -LINEAR_SPEED;
+        message_out.x += -LINEAR_SPEED;
         // message_out.z = 0;
         break;
 
     case D_KEY:
         // message_out.x = 0;
-        message_out.z = -ANGULAR_SPEED;
+        message_out.z += -ANGULAR_SPEED;
         break;
 
     default:
@@ -63,7 +65,44 @@ void keydown_callback(const keyboard::Key& msg)
     
     }
     my_publisher_object.publish(message_out);
+    // last_key_time = ros::Time::now();
 
+}
+
+void keyup_callback(const keyboard::Key& msg)
+{
+    ROS_INFO("Key released has code: %d", msg.code);
+    int key = msg.code;
+    switch (key)
+    {
+    case W_KEY:
+        message_out.x -= LINEAR_SPEED;
+        // message_out.z = 0;
+        break;
+
+    case A_KEY:
+        // message_out.x = 0;
+        message_out.z -= ANGULAR_SPEED;
+        break;
+
+    case S_KEY:
+        message_out.x -= -LINEAR_SPEED;
+        // message_out.z = 0;
+        break;
+
+    case D_KEY:
+        // message_out.x = 0;
+        message_out.z -= -ANGULAR_SPEED;
+        break;
+
+    default:
+        message_out.x = 0;
+        message_out.z = 0;
+        break;
+    
+    }
+    my_publisher_object.publish(message_out);
+    // message_in.code = 0;
 
 }
 
@@ -90,6 +129,7 @@ int main(int argc, char **argv)
     name of the topic that you want to subscribe to. The second argument is the buffer size which
     we will just set to 1. The third argument is the callback function that gets called when data
     is published to this topic. This works like an interupt.*/
+    keyup_in = n.subscribe("/keyboard/keyup", 1, keyup_callback);
 
     while (ros::ok()) // The ros::ok() function returns true as long as ROS is running
     {
