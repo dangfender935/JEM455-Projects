@@ -15,7 +15,7 @@
 #define X_KEY           (120)
 #define C_KEY           (99)
 #define LINEAR_SPEED    (2)
-#define ANGULAR_SPEED   (1)
+#define ANGULAR_SPEED   (2)
 
 // Global variables
 keyboard::Key message_in; // This will hold the message from the topic we subscribe to
@@ -34,7 +34,8 @@ so we can use it in other functions.*/
 void keydown_callback(const keyboard::Key& msg)
 {
     message_in = msg; // Store the data from this topic into our global variable
-    ROS_INFO("Key pressed has code: %d",message_in.code); /* This is how we do print statements in
+    // ROS_INFO("Key pressed has code: %d",message_in.code);
+    /* This is how we do print statements in
     ROS. Here we are just printing the code for the key that was pressed.*/
     switch (message_in.code)
     {
@@ -71,7 +72,7 @@ void keydown_callback(const keyboard::Key& msg)
 
 void keyup_callback(const keyboard::Key& msg)
 {
-    ROS_INFO("Key released has code: %d", msg.code);
+    // ROS_INFO("Key released has code: %d", msg.code);
     int key = msg.code;
     switch (key)
     {
