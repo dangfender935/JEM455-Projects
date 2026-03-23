@@ -16,28 +16,30 @@ geometry_msgs::Vector3 local_velocity;
 
 float enc_left = 0;
 float enc_right = 0;
-
-
-
+float last_enc_left = 0.f; 
+float last_enc_right = 0.f;
+bool left_enc_flag = false;
+bool right_enc_flag = false;
 
 void enc_left_recv_callback(const std_msgs::Float64& msg)
 {
+    last_enc_left = (left_enc_flag) ? enc_left : msg.data;
     enc_left = msg.data;
-
+    left_enc_flag = true;
 }
 
 void enc_right_recv_callback(const std_msgs::Float64& msg)
 {
+    last_enc_right = (right_enc_flag) ? enc_right : msg.data;
     enc_right = msg.data;
-    
+    right_enc_flag = true;
 }
 
 int main(int argc, char **argv)
 {
     pose_est::pose_est_msg current_position;
     ros::Time time_obj;
-    float last_enc_left = 0.f; 
-    float last_enc_right = 0.f;
+    
     float delta_enc_left = 0.f; 
     float delta_enc_right = 0.f;
     float d_inv = 1 / WHEEL_SEPARATION;
@@ -63,16 +65,6 @@ int main(int argc, char **argv)
     float rate = 20.f;
     ros::Rate r((int)rate);
     float Ts = 1/rate;
-    while (ros::ok())
-    {
-        if ((enc_left != 0.0) && (enc_right != 0.0))
-        {
-            last_enc_left = enc_left;
-            last_enc_right = enc_right;
-            break;
-        }
-        ros::spinOnce();
-    }
     while (ros::ok())
     {
         delta_enc_left = enc_left - last_enc_left;

@@ -2,8 +2,8 @@
 #include <geometry_msgs/Vector3.h>
 #include <std_msgs/Float64.h>
 
-#define WHEEL_SEPARATION        (3.0)
-#define WHEEL_RADIUS            (0.5)
+#define WHEEL_SEPARATION        (245.f)   // mm
+#define WHEEL_RADIUS            (33.1)  // mm
 
 std_msgs::Float64 left_vel;
 std_msgs::Float64 right_vel;

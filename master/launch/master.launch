@@ -4,6 +4,7 @@
 	<node name="keyboard" pkg="keyboard" type="keyboard" output="screen" />
     <node name="mobile_ik" pkg="mobile_ik" type="mobile_ik" output="screen"/>
 	<node name="pose_est" pkg="pose_est" type="pose_est" output="screen"/>
+	<node name="pose_controller" pkg="pose_controller" type="pose_controller" output="screen"/>
 	<node name="serial_node" pkg="rosserial_arduino" type="serial_node.py" output="screen">
 		<param name="port" type="string" value="/dev/ttyACM0"/>
 	</node>
