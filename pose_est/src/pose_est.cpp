@@ -35,6 +35,13 @@ void enc_right_recv_callback(const std_msgs::Float64& msg)
     right_enc_flag = true;
 }
 
+inline float normalize_angle(float angle)
+{
+    while (angle > M_PI) angle -= 2*M_PI;
+    while (angle < -M_PI) angle += 2*M_PI;
+    return angle;
+}
+
 int main(int argc, char **argv)
 {
     pose_est::pose_est_msg current_position;
@@ -96,7 +103,7 @@ int main(int argc, char **argv)
         // ROS_INFO("Pose: %f %f %f", x, y, th);
         current_position.point.x = x;
         current_position.point.y = y;
-        current_position.point.z = th;
+        current_position.point.z = normalize_angle(th);
         current_position.header.stamp = time_obj.now();
         current_position.name = STATE_STRING;
         current_position.id = 18273645;
