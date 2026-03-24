@@ -4,12 +4,12 @@
 #include <geometry_msgs/Point.h>
 #include <math.h>
 
-#define K1      (0.9)
+#define K1      (0.75)
 #define K2      (1)
 #define K3      (1)
 #define MAX_X_VEL   (100)
-#define MAX_TH_VEL  (0.75)
-#define DISTANCE_ERROR_THRESHOLD    (9.0)
+#define MAX_TH_VEL  (0.3)
+#define DISTANCE_ERROR_THRESHOLD    (5.0)
 #define ANGLE_ERROR_THRESHOLD       (0.03)
 #define OVERSHOOT_THRESHOLD         (0.5)
 
@@ -59,8 +59,9 @@ void curr_pose_recv_callback(const pose_est::pose_est_msg& msg)
     float dy = 0;
     float rho = 0.f;
     float alpha = 0.f;
-    float eta= 0.f;
-    float speed = 0.f;
+    float eta = 0.f;
+    float zspeed = 0.f;
+    float xspeed = 0.f;
     static float last_rho;
     curr_pose = msg.point;
     switch (move_state)
@@ -68,34 +69,32 @@ void curr_pose_recv_callback(const pose_est::pose_est_msg& msg)
     case CORRECT_DIRECTION_ERROR:
         dx = desired_global_x - curr_pose.x;
         dy = desired_global_y - curr_pose.y;
-        alpha = normalize_angle(atan2(dy, dx) - curr_pose.z);
+        alpha = normalize_angle(atan2(dy, dx) - curr_pose.z);        
         ROS_INFO("ALPHA = %f", alpha);
 
         if (abs(alpha) < ANGLE_ERROR_THRESHOLD) 
         {
             move_state = CORRECT_DISTANCE_ERROR;
             msg_out.z = 0.f;
-            rho = sqrt(pow(dx, 2) + pow(dy, 2));
-            if (rho < DISTANCE_ERROR_THRESHOLD)
-            {
-                move_state = CORRECT_ORIENTATION_ERROR;
-                msg_out.x = 0.f;
-            }
-            else
-            {
-                speed = K1*rho;
-                msg_out.x = (speed > MAX_X_VEL) ? MAX_X_VEL : speed;
-                last_rho = rho;
-                break;
-            }
-            msg_out.z = 0.f;
-            last_rho = 0.f;
+            // last_rho = sqrt(pow(dx, 2) + pow(dy, 2)) + DISTANCE_ERROR_THRESHOLD;
+            // if (rho < DISTANCE_ERROR_THRESHOLD)
+            // {
+            //     move_state = CORRECT_ORIENTATION_ERROR;
+            //     msg_out.x = 0.f;
+            // }
+            // else
+            // {
+            //     speed = K1*rho;
+            //     msg_out.x = (speed > MAX_X_VEL) ? MAX_X_VEL : speed;
+            //     last_rho = rho;
+            //     break;
+            // }
         }
         else 
         {
-            speed = K2*alpha;
-            ROS_INFO("Speed = %f", speed);
-            msg_out.z = (speed > MAX_TH_VEL) ? MAX_TH_VEL : speed;
+            zspeed = K2*alpha;
+            ROS_INFO("Speed = %f", zspeed);
+            msg_out.z = (zspeed > MAX_TH_VEL) ? MAX_TH_VEL : (zspeed < -MAX_TH_VEL) ? -MAX_TH_VEL : zspeed;
         }
         ROS_INFO("msg_out = %f %f %f", msg_out.x, msg_out.y, msg_out.z);
         break;
@@ -104,21 +103,26 @@ void curr_pose_recv_callback(const pose_est::pose_est_msg& msg)
         dx = desired_global_x - curr_pose.x;
         dy = desired_global_y - curr_pose.y;
         rho = sqrt(pow(dx, 2) + pow(dy, 2));
-        speed = K1*rho;
+        alpha = normalize_angle(atan2(dy, dx) - curr_pose.z);
         ROS_INFO("RHO = %f   Last RHO = %f", rho, last_rho);
-        msg_out.x = (speed > MAX_X_VEL) ? MAX_X_VEL : speed * (rho > DISTANCE_ERROR_THRESHOLD) * (last_rho > rho);
         ROS_INFO("msg_out = %f %f %f", msg_out.x, msg_out.y, msg_out.z);
 
-        if (msg_out.x == 0.0)
+        if ((rho < DISTANCE_ERROR_THRESHOLD))
         {
             move_state = CORRECT_ORIENTATION_ERROR;
-            last_rho = 0.f;
+            msg_out.x = 0.f;
+            msg_out.z = 0.f;
+            // last_rho = 0.f;
         }
         else
         {
+            xspeed = K1 * rho;
+            zspeed = K2 * alpha;
+            msg_out.x = (xspeed > MAX_X_VEL) ? MAX_X_VEL : xspeed;
+            msg_out.z = (zspeed > MAX_TH_VEL) ? MAX_TH_VEL : (zspeed < -MAX_TH_VEL) ? -MAX_TH_VEL : zspeed;
             last_rho = rho;
-            break;
         }
+        break;
 
     case CORRECT_ORIENTATION_ERROR:
         eta = desired_global_th - curr_pose.z;
@@ -133,10 +137,10 @@ void curr_pose_recv_callback(const pose_est::pose_est_msg& msg)
         }
         else
         {
-            speed = K3*eta;
-            msg_out.z = (speed > MAX_TH_VEL) ? MAX_TH_VEL : speed;
-            break;
+            zspeed = K3*eta;
+            msg_out.z = (zspeed > MAX_TH_VEL) ? MAX_TH_VEL : (zspeed < -MAX_TH_VEL) ? -MAX_TH_VEL : zspeed;
         }
+        break;
 
     case INACTIVE:
     default:
@@ -145,9 +149,6 @@ void curr_pose_recv_callback(const pose_est::pose_est_msg& msg)
         msg_out.z = 0.f;
         break;
     }
-
-    // ROS_INFO("desired global x - curr pose x: %f - %f = %f", desired_global_x, curr_pose.x, dx);
-    // ROS_INFO("rho = %f", rho);
 
     local_vel_pub.publish(msg_out);
 
