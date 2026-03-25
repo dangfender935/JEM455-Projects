@@ -1,0 +1,7 @@
+<launch>
+	<arg name="json_file" default="checkpoints.json" />
+
+	<node name="pose_checkpoint" pkg="pose_checkpoint" type="pose_checkpoint"  output="screen" >
+		<param name="json_file" value="$(find pose_checkpoint)/data/$(arg json_file)" />
+	</node>
+</launch>

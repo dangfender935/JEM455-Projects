@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(master)
+project(pose_checkpoint)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -8,9 +8,7 @@ project(master)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  keyboard
   roscpp
-  geometry_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -104,8 +102,8 @@ find_package(catkin REQUIRED COMPONENTS
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES master
-#  CATKIN_DEPENDS keyboard roscpp
+#  LIBRARIES pose_checkpoint
+#  CATKIN_DEPENDS roscpp
 #  DEPENDS system_lib
 )
 
@@ -123,7 +121,7 @@ include_directories(
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/master.cpp
+#   src/${PROJECT_NAME}/pose_checkpoint.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -134,7 +132,7 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(master src/master.cpp)
+add_executable(pose_checkpoint src/pose_checkpoint.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -147,7 +145,7 @@ add_executable(master src/master.cpp)
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(pose_checkpoint
   ${catkin_LIBRARIES}
 )
 
@@ -198,7 +196,7 @@ target_link_libraries(${PROJECT_NAME}
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_master.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_pose_checkpoint.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()
