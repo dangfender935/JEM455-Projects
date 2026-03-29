@@ -1,20 +1,32 @@
 #include <ros/ros.h>
+#include <sensor_msgs/JointState.h>
 #include <geometry_msgs/Vector3.h>
 #include <math.h>
 
+#define JOINT1          (0)
+#define JOINT2          (1)
+#define JOINT3          (2)
+#define JOINT4          (3)
+#define JOINT5          (4)
+
+
 typedef float q_t;
 ros::Subscriber joint_state_sub;
-
+float q1val, q2val, q3val, q4val, q5val;
 
 ros::Publisher endaffector_pub;
 geometry_msgs::Vector3 endaffector_pos;
 
-/*
-void joint_state_recv_callback()
+
+void joint_state_recv_callback(const sensor_msgs::JointState& msg)
 {
-    
+    q1val = msg.position[JOINT1];
+    q2val = msg.position[JOINT2];
+    q3val = msg.position[JOINT3];
+    q4val = msg.position[JOINT4];
+    q5val = msg.position[JOINT5];
 }
-*/
+
 
 geometry_msgs::Vector3 calc_endaffector_position(q_t q1, q_t q2, q_t q3, q_t q4, q_t q5)
 {
@@ -30,14 +42,16 @@ geometry_msgs::Vector3 calc_endaffector_position(q_t q1, q_t q2, q_t q3, q_t q4,
 
 int main (int argc, char **argv)
 {
+    ros::init(argc, argv, "jetarm_ik");
     ros::NodeHandle nodeHandle;
-
-    // joint_state_sub = nodeHandle.subscribe("/joint_states", 1, joint_state_recv_callback);
+    q1val = q2val = q3val = q4val = q5val = 0.f;
+    joint_state_sub = nodeHandle.subscribe("/joint_states", 1, joint_state_recv_callback);
 
     endaffector_pub = nodeHandle.advertise<geometry_msgs::Vector3>("arm_task_space", 1);
 
     while (ros::ok())
     {
+        endaffector_pub.publish(calc_endaffector_position(q1val, q2val, q3val, q4val, q5val));
         ros::spinOnce();
     }
     return 0;
