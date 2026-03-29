@@ -6,12 +6,12 @@
 #include <keyboard/Key.h> // This is where the keyboard/Key message type is defined
 #include <math.h>
 
-#define K1                          (0.75)
+#define K1                          (0.8) // 0.75
 #define K2                          (1)
 #define K3                          (1)
 
-#define MAX_X_VEL                   (75)
-#define MAX_TH_VEL                  (0.4)
+#define MAX_X_VEL                   (85) // 75
+#define MAX_TH_VEL                  (0.75) // 0.4
 #define DISTANCE_ERROR_THRESHOLD    (5.0)
 #define ANGLE_ERROR_THRESHOLD       (0.03)
 #define OVERSHOOT_THRESHOLD         (0.5)
@@ -79,6 +79,8 @@ inline float normalize_angle(float angle)
 
 void curr_pose_recv_callback(const pose_est::pose_est_msg& msg)
 {
+    // The bot will actually try to fix direction error first if paused in the middle of correcting orientation
+    // error. Fix this by checking rho before fixing direction error!
     float dx = 0.f;
     float dy = 0;
     float rho = 0.f;

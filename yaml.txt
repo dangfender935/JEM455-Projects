@@ -1,0 +1,6 @@
+rostopic pub /controllers/set_joint
+hiwonder_interfaces/JointMove "
+name : joint1
+rad : 0.5
+duration : 1.0
+"
