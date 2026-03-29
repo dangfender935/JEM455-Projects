@@ -1,0 +1,3 @@
+<launch>
+    <node name="jetarm_fk" pkg = "jetarm_fk" type="jetarm_fk" output="screen"/>
+</launch>
