@@ -17,17 +17,6 @@ float q1val, q2val, q3val, q4val, q5val;
 ros::Publisher endaffector_pub;
 geometry_msgs::Vector3 endaffector_pos;
 
-
-void joint_state_recv_callback(const sensor_msgs::JointState& msg)
-{
-    q1val = msg.position[JOINT1];
-    q2val = msg.position[JOINT2];
-    q3val = msg.position[JOINT3];
-    q4val = msg.position[JOINT4];
-    q5val = msg.position[JOINT5];
-}
-
-
 geometry_msgs::Vector3 calc_endaffector_position(q_t q1, q_t q2, q_t q3, q_t q4, q_t q5)
 {
     geometry_msgs::Vector3 endaff_p;
@@ -40,9 +29,22 @@ geometry_msgs::Vector3 calc_endaffector_position(q_t q1, q_t q2, q_t q3, q_t q4,
     return endaff_p;
 }
 
+void joint_state_recv_callback(const sensor_msgs::JointState& msg)
+{
+    q1val = msg.position[JOINT1];
+    q2val = msg.position[JOINT2];
+    q3val = msg.position[JOINT3];
+    q4val = msg.position[JOINT4];
+    q5val = msg.position[JOINT5];
+    endaffector_pub.publish(calc_endaffector_position(q1val, q2val, q3val, q4val, q5val));
+
+}
+
+
+
 int main (int argc, char **argv)
 {
-    ros::init(argc, argv, "jetarm_ik");
+    ros::init(argc, argv, "jetarm_fk");
     ros::NodeHandle nodeHandle;
     q1val = q2val = q3val = q4val = q5val = 0.f;
     joint_state_sub = nodeHandle.subscribe("/joint_states", 1, joint_state_recv_callback);
@@ -51,7 +53,6 @@ int main (int argc, char **argv)
 
     while (ros::ok())
     {
-        endaffector_pub.publish(calc_endaffector_position(q1val, q2val, q3val, q4val, q5val));
         ros::spinOnce();
     }
     return 0;
