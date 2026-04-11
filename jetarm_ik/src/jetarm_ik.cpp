@@ -12,18 +12,18 @@ typedef float q_t;
 typedef Matrix<float, 5, 1> config_t;
 typedef Matrix<float, 3, 5> jac_t;
 typedef Matrix<float, 5, 3> invjac_t;   // not necessary?
-typedef Vector3f pos_t;
+typedef Vector3f xyz_vec;
 
 ros::Subscriber desired_taskspace_sub;
 ros::Subscriber curr_taskspace_sub;
-pos_t curr_taskspace {0.f, 0.f, 0.f};
+xyz_vec curr_taskspace {0.f, 0.f, 0.f};
 
 ros::Publisher set_joint_pub;
 geometry_msgs::Vector3 joint_pos_out;
 
-pos_t calc_endaffector_position(config_t q)
+xyz_vec calc_endaffector_position(config_t q)
 {
-    pos_t lambda;
+    xyz_vec lambda;
     q_t q1 = q(0);
     q_t q2 = q(1);
     q_t q3 = q(2);
@@ -60,21 +60,21 @@ jac_t jacobian(config_t q)
     return J;
 }
 
-config_t calc_jetarm_ik(pos_t lambda_d)
+config_t calc_jetarm_ik(xyz_vec lambda_d)
 {
     float K = 0.1;
     int max_iter = 1000;
     float error_threshold = 0.001;
-    pos_t lambda_error, curr_lambda;
+    xyz_vec lambda_error, curr_lambda;
     config_t q;
     jac_t J;
     invjac_t Jinv;
     
-    q << 0.01,
-         -0.023,
-         0.02,
-         -0.09,
-         0.06;
+    q << 0.0,
+         0.0,
+         0.0,
+         0.0,
+         0.0;
     
     for (int i = 0; i < max_iter; i++)
     {
@@ -91,6 +91,7 @@ config_t calc_jetarm_ik(pos_t lambda_d)
         {
             ROS_INFO("Reached Singularity!");
             q << q + MatrixXf::Random(5, 1)*0.005;
+            q(4) = 0.0; // set joint 5 to zero as it has no bearing on the xyz of end affector
             continue;
         }
         q << q + K*Jinv*lambda_error;
@@ -139,22 +140,26 @@ int main(int argc, char **argv)
     config_t q;
     jac_t J;
     invjac_t Jinv2;
-    pos_t lambda_d, lambda_n, lambda_err;
+    xyz_vec lambda_d, lambda_n, lambda_err;
     q << 0.01,
          -0.023,
          0.02,
          -0.09,
          0.06;
     ROS_INFO("initial [q] = [%f %f %f %f %f]", q[0], q[1], q[2], q[3], q[4]);
+
+    lambda_n << calc_endaffector_position(q);
+    ROS_INFO("initial endaffector position: [%f %f %f]", lambda_n(0), lambda_n(1), lambda_n(2));
+
     J << jacobian(q);    
     ROS_INFO("Jacobian complete!");
 
     Jinv2 << J.transpose() * (J*J.transpose()).inverse();
     ROS_INFO("[Jinv] = [%f %f %f]", Jinv2(0, 0), Jinv2(0, 1), Jinv2(0, 2));
-    ROS_INFO("[Jinv] = [%f %f %f]", Jinv2(1, 0), Jinv2(1, 1), Jinv2(1, 2));
-    ROS_INFO("[Jinv] = [%f %f %f]", Jinv2(2, 0), Jinv2(2, 1), Jinv2(2, 2));
-    ROS_INFO("[Jinv] = [%f %f %f]", Jinv2(3, 0), Jinv2(3, 1), Jinv2(3, 2));
-    ROS_INFO("[Jinv] = [%f %f %f]", Jinv2(4, 0), Jinv2(4, 1), Jinv2(4, 2));
+    ROS_INFO("         [%f %f %f]", Jinv2(1, 0), Jinv2(1, 1), Jinv2(1, 2));
+    ROS_INFO("         [%f %f %f]", Jinv2(2, 0), Jinv2(2, 1), Jinv2(2, 2));
+    ROS_INFO("         [%f %f %f]", Jinv2(3, 0), Jinv2(3, 1), Jinv2(3, 2));
+    ROS_INFO("         [%f %f %f]", Jinv2(4, 0), Jinv2(4, 1), Jinv2(4, 2));
 
     lambda_d << 0.3737, 0.0, 0.10432;
     q << calc_jetarm_ik(lambda_d);
