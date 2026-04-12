@@ -3,8 +3,15 @@
 #include <math.h>
 #include <geometry_msgs/Vector3.h>
 #include <hiwonder_interfaces/JointMove.h>
+#include <sensor_msgs/JointState.h>
 #include <ctime>
 #include <cstdlib>
+
+#define JOINT1          (0)
+#define JOINT2          (1)
+#define JOINT3          (2)
+#define JOINT4          (3)
+#define JOINT5          (4)
 
 using namespace Eigen;
 
@@ -12,18 +19,19 @@ typedef float q_t;
 typedef Matrix<float, 5, 1> config_t;
 typedef Matrix<float, 3, 5> jac_t;
 typedef Matrix<float, 5, 3> invjac_t;   // not necessary?
-typedef Vector3f xyz_vec;
+typedef Vector3f taskspace_t;
 
 ros::Subscriber desired_taskspace_sub;
-ros::Subscriber curr_taskspace_sub;
-xyz_vec curr_taskspace {0.f, 0.f, 0.f};
+ros::Subscriber curr_config_sub;
+config_t curr_config{};
+bool config_recv = false;
 
 ros::Publisher set_joint_pub;
-geometry_msgs::Vector3 joint_pos_out;
+hiwonder_interfaces::JointMove joint_pos_out;
 
-xyz_vec calc_endaffector_position(config_t q)
+taskspace_t calc_endaffector_position(config_t q)
 {
-    xyz_vec lambda;
+    taskspace_t lambda;
     q_t q1 = q(0);
     q_t q2 = q(1);
     q_t q3 = q(2);
@@ -44,37 +52,31 @@ jac_t jacobian(config_t q)
     float q3 = q[2];
     float q4 = q[3];
     float q5 = q[4];
-    ROS_INFO("[q] = [%f %f %f %f %f]", q1, q2, q3, q4, q5);
+    // ROS_INFO("[q] = [%f %f %f %f %f]", q1, q2, q3, q4, q5);
     jac_t J;
     J << 
         (6471*cos(q1 - q2))/100000 - (6471*cos(q1 + q2 + q3))/100000 + (6471*cos(q2 - q1 + q3))/100000 - (5743*cos(q1 + q2 + q3 + q4))/100000 - (6471*cos(q1 + q2))/100000 + (5743*cos(q2 - q1 + q3 + q4))/100000, - (6471*cos(q1 - q2))/100000 - (6471*cos(q1 + q2 + q3))/100000 - (6471*cos(q2 - q1 + q3))/100000 - (5743*cos(q1 + q2 + q3 + q4))/100000 - (6471*cos(q1 + q2))/100000 - (5743*cos(q2 - q1 + q3 + q4))/100000, - (6471*cos(q1 + q2 + q3))/100000 - (6471*cos(q2 - q1 + q3))/100000 - (5743*cos(q1 + q2 + q3 + q4))/100000 - (5743*cos(q2 - q1 + q3 + q4))/100000, - (5743*cos(q1 + q2 + q3 + q4))/100000 - (5743*cos(q2 - q1 + q3 + q4))/100000, 0,
         (6471*sin(q1 - q2))/100000 - (6471*sin(q1 + q2 + q3))/100000 - (6471*sin(q2 - q1 + q3))/100000 - (5743*sin(q1 + q2 + q3 + q4))/100000 - (6471*sin(q1 + q2))/100000 - (5743*sin(q2 - q1 + q3 + q4))/100000,   (6471*sin(q2 - q1 + q3))/100000 - (6471*sin(q1 + q2 + q3))/100000 - (6471*sin(q1 - q2))/100000 - (5743*sin(q1 + q2 + q3 + q4))/100000 - (6471*sin(q1 + q2))/100000 + (5743*sin(q2 - q1 + q3 + q4))/100000,   (6471*sin(q2 - q1 + q3))/100000 - (6471*sin(q1 + q2 + q3))/100000 - (5743*sin(q1 + q2 + q3 + q4))/100000 + (5743*sin(q2 - q1 + q3 + q4))/100000,   (5743*sin(q2 - q1 + q3 + q4))/100000 - (5743*sin(q1 + q2 + q3 + q4))/100000, 0,
                                                                                                                                                                                                             0,                                                                                                                          -(5743*sin(q2 + q3 + q4))/50000 - (6471*sin(q2 + q3))/50000 - (6471*sin(q2))/50000,                                                                                       -(5743*sin(q2 + q3 + q4))/50000 - (6471*sin(q2 + q3))/50000,                                               -(5743*sin(q2 + q3 + q4))/50000, 0
     ;
-    ROS_INFO("[J] = [%f %f %f %f %f]", J(0, 0), J(0, 1), J(0, 2), J(0, 3), J(0, 4));
-    ROS_INFO("      [%f %f %f %f %f]", J(1, 0), J(1, 1), J(1, 2), J(1, 3), J(1, 4));
-    ROS_INFO("      [%f %f %f %f %f]", J(2, 0), J(2, 1), J(2, 2), J(2, 3), J(2, 4));
-
-
+    // ROS_INFO("[J] = [%f %f %f %f %f]", J(0, 0), J(0, 1), J(0, 2), J(0, 3), J(0, 4));
+    // ROS_INFO("      [%f %f %f %f %f]", J(1, 0), J(1, 1), J(1, 2), J(1, 3), J(1, 4));
+    // ROS_INFO("      [%f %f %f %f %f]", J(2, 0), J(2, 1), J(2, 2), J(2, 3), J(2, 4));
 
     return J;
 }
 
-config_t calc_jetarm_ik(xyz_vec lambda_d)
+config_t calc_jetarm_ik(taskspace_t lambda_d)
 {
     float K = 0.1;
     int max_iter = 1000;
     float error_threshold = 0.001;
-    xyz_vec lambda_error, curr_lambda;
+    taskspace_t lambda_error, curr_lambda;
     config_t q;
     jac_t J;
     invjac_t Jinv;
     
-    q << 0.0,
-         0.0,
-         0.0,
-         0.0,
-         0.0;
+    q << curr_config;
     
     for (int i = 0; i < max_iter; i++)
     {
@@ -91,37 +93,100 @@ config_t calc_jetarm_ik(xyz_vec lambda_d)
         {
             ROS_INFO("Reached Singularity!");
             q << q + MatrixXf::Random(5, 1)*0.005;
-            q(4) = 0.0; // set joint 5 to zero as it has no bearing on the xyz of end affector
             continue;
         }
         q << q + K*Jinv*lambda_error;
         
     }
     
-    for (int i = 0; i < 5; i++)
+    for (int i = 0; i < 4; i++)
     {
         while (q[i] > M_PI) q[i] -= 2*M_PI;
         while (q[i] < -M_PI) q[i] += 2*M_PI;
     }
-
+    q(4) = 0.0;
     return q;
 }
 
-void desired_taskspace_recv_callback(const geometry_msgs::Vector3& lambda_d)
+void virtual_ik()
 {
-    Vector3f lambda_vec;
-    config_t qd;
-    lambda_vec << lambda_d.x, lambda_d.y, lambda_d.z;
-    ROS_INFO("Taskspace received!");
-    qd << calc_jetarm_ik(lambda_vec);
-    ROS_INFO("qd = %f %f %f %f %f", qd[0], qd[1], qd[2], qd[3], qd[4]);
+    config_t q;
+    jac_t J;
+    invjac_t Jinv2;
+    taskspace_t lambda_d, lambda_n, lambda_err;
+    
+    lambda_n << calc_endaffector_position(curr_config);
+    ROS_INFO("initial endaffector position: [%f %f %f]", lambda_n(0), lambda_n(1), lambda_n(2));
+    
+    J << jacobian(q);    
+    ROS_INFO("Jacobian complete!");
+    
+    Jinv2 << J.transpose() * (J*J.transpose()).inverse();
+    ROS_INFO("[Jinv] = [%f %f %f]", Jinv2(0, 0), Jinv2(0, 1), Jinv2(0, 2));
+    ROS_INFO("         [%f %f %f]", Jinv2(1, 0), Jinv2(1, 1), Jinv2(1, 2));
+    ROS_INFO("         [%f %f %f]", Jinv2(2, 0), Jinv2(2, 1), Jinv2(2, 2));
+    ROS_INFO("         [%f %f %f]", Jinv2(3, 0), Jinv2(3, 1), Jinv2(3, 2));
+    ROS_INFO("         [%f %f %f]", Jinv2(4, 0), Jinv2(4, 1), Jinv2(4, 2));
+    
+    lambda_d << 0.3737, 0.0, 0.10432;
+    q << calc_jetarm_ik(lambda_d);
+    ROS_INFO("final [q] = [%f %f %f %f %f]", q[0], q[1], q[2], q[3], q[4]);
 }
 
-void curr_taskspace_recv_callback(const geometry_msgs::Vector3& lambda)
+void test_arm(config_t q)
 {
-    curr_taskspace << lambda.x, lambda.y, lambda.z;
-    ROS_INFO("Received current taskspace!");
-    curr_taskspace_sub.shutdown();
+    ros::Rate r(0.25);
+    joint_pos_out.name = "joint1";
+    joint_pos_out.rad = q(0);
+    joint_pos_out.duration = 2.0;
+    set_joint_pub.publish(joint_pos_out);
+    r.sleep();
+    
+    joint_pos_out.name = "joint2";
+    joint_pos_out.rad = q(1);
+    joint_pos_out.duration = 2.0;
+    set_joint_pub.publish(joint_pos_out);
+    r.sleep();
+    
+    joint_pos_out.name = "joint3";
+    joint_pos_out.rad = q(2);
+    joint_pos_out.duration = 2.0;
+    set_joint_pub.publish(joint_pos_out);
+    r.sleep();
+    
+    joint_pos_out.name = "joint4";
+    joint_pos_out.rad = q(3);
+    joint_pos_out.duration = 2.0;
+    set_joint_pub.publish(joint_pos_out);
+    r.sleep();
+    
+    joint_pos_out.name = "joint5";
+    joint_pos_out.rad = q(4);
+    joint_pos_out.duration = 2.0;
+    set_joint_pub.publish(joint_pos_out);
+}
+
+void curr_config_recv_callback(const sensor_msgs::JointState& q_msg)
+{
+    curr_config <<  q_msg.position[JOINT1],
+                    q_msg.position[JOINT2],
+                    q_msg.position[JOINT3],
+                    q_msg.position[JOINT4],
+                    q_msg.position[JOINT5];
+
+    ROS_INFO("Current config space = [%f %f %f %f %f]", 
+        curr_config(0), curr_config(1), curr_config(2), curr_config(3), curr_config(4));
+    config_recv = true;
+    curr_config_sub.shutdown();
+}
+
+void desired_taskspace_recv_callback(const geometry_msgs::Vector3& lambda_d_msg)
+{
+    taskspace_t lambda_d;
+    ROS_INFO("New desired taskspace received!");
+    lambda_d << lambda_d_msg.x, lambda_d_msg.y, lambda_d_msg.z;
+    curr_config << calc_jetarm_ik(lambda_d);
+    test_arm(curr_config);
 }
 
 int main(int argc, char **argv)
@@ -131,40 +196,14 @@ int main(int argc, char **argv)
 
     ros::NodeHandle nodeHandle;
 
-    // desired_taskspace_sub = nodeHandle.subscribe("arm_desired_task_space", 1, desired_taskspace_recv_callback);
-    // curr_taskspace_sub = nodeHandle.subscribe("arm_task_space", 1, curr_taskspace_recv_callback);
+    curr_config_sub = nodeHandle.subscribe("/joint_states", 1, curr_config_recv_callback);
+    while (!config_recv) ros::spinOnce();
     
+    desired_taskspace_sub = nodeHandle.subscribe("arm_desired_task_space", 1, desired_taskspace_recv_callback);
+    
+    set_joint_pub = nodeHandle.advertise<hiwonder_interfaces::JointMove>("/controllers/set_joint", 1);
 
-    // set_joint_pub = nodeHandle.advertise<geometry_msgs::Vector3>("/controllers/set_joint", 1);
-
-    config_t q;
-    jac_t J;
-    invjac_t Jinv2;
-    xyz_vec lambda_d, lambda_n, lambda_err;
-    q << 0.01,
-         -0.023,
-         0.02,
-         -0.09,
-         0.06;
-    ROS_INFO("initial [q] = [%f %f %f %f %f]", q[0], q[1], q[2], q[3], q[4]);
-
-    lambda_n << calc_endaffector_position(q);
-    ROS_INFO("initial endaffector position: [%f %f %f]", lambda_n(0), lambda_n(1), lambda_n(2));
-
-    J << jacobian(q);    
-    ROS_INFO("Jacobian complete!");
-
-    Jinv2 << J.transpose() * (J*J.transpose()).inverse();
-    ROS_INFO("[Jinv] = [%f %f %f]", Jinv2(0, 0), Jinv2(0, 1), Jinv2(0, 2));
-    ROS_INFO("         [%f %f %f]", Jinv2(1, 0), Jinv2(1, 1), Jinv2(1, 2));
-    ROS_INFO("         [%f %f %f]", Jinv2(2, 0), Jinv2(2, 1), Jinv2(2, 2));
-    ROS_INFO("         [%f %f %f]", Jinv2(3, 0), Jinv2(3, 1), Jinv2(3, 2));
-    ROS_INFO("         [%f %f %f]", Jinv2(4, 0), Jinv2(4, 1), Jinv2(4, 2));
-
-    lambda_d << 0.3737, 0.0, 0.10432;
-    q << calc_jetarm_ik(lambda_d);
-    ROS_INFO("final [q] = [%f %f %f %f %f]", q[0], q[1], q[2], q[3], q[4]);
-
+    // virtual_ik();
 
     while (ros::ok())
     {
