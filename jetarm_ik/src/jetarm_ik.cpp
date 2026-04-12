@@ -12,6 +12,20 @@
 #define JOINT3          (2)
 #define JOINT4          (3)
 #define JOINT5          (4)
+#define MIN             (0)
+#define MAX             (1)
+
+#define JOINT1_MIN      (-2.09)
+#define JOINT1_MAX      (2.09)
+#define JOINT2_MIN      (-1.67)
+#define JOINT2_MAX      (1.65)
+#define JOINT3_MIN      (-2.09)
+#define JOINT3_MAX      (2.09)
+#define JOINT4_MIN      (-1.85)
+#define JOINT4_MAX      (2.00)
+#define JOINT5_MIN      (-2.09)
+#define JOINT5_MAX      (2.09)
+
 
 using namespace Eigen;
 
@@ -71,6 +85,14 @@ config_t calc_jetarm_ik(taskspace_t lambda_d)
     float K = 0.1;
     int max_iter = 1000;
     float error_threshold = 0.001;
+    q_t joint_limits[5][2] = {
+        {JOINT1_MIN, JOINT1_MAX},
+        {JOINT2_MIN, JOINT2_MAX},
+        {JOINT3_MIN, JOINT3_MAX},
+        {JOINT4_MIN, JOINT4_MAX},
+        {JOINT5_MIN, JOINT5_MAX},
+    };
+
     taskspace_t lambda_error, curr_lambda;
     config_t q;
     jac_t J;
@@ -91,7 +113,7 @@ config_t calc_jetarm_ik(taskspace_t lambda_d)
 
         if (!Jinv.allFinite())
         {
-            ROS_INFO("Reached Singularity!");
+            // ROS_INFO("Reached Singularity!");
             q << q + MatrixXf::Random(5, 1)*0.005;
             continue;
         }
@@ -101,10 +123,18 @@ config_t calc_jetarm_ik(taskspace_t lambda_d)
     
     for (int i = 0; i < 4; i++)
     {
+        // Wrap to pi
         while (q[i] > M_PI) q[i] -= 2*M_PI;
         while (q[i] < -M_PI) q[i] += 2*M_PI;
+
+        // Make sure each joint is within joint limits
+        q[i] = (q[i] > joint_limits[i][MAX]) ? 
+                    joint_limits[i][MAX] : 
+                    (q[i] < joint_limits[i][MIN]) ?
+                        joint_limits[i][MIN] :
+                        q[i];
     }
-    q(4) = 0.0;
+    q(4) = 0.0; // set joint 5 to 0.0 as it has no effect on xyz position
     return q;
 }
 
@@ -114,6 +144,35 @@ void virtual_ik()
     jac_t J;
     invjac_t Jinv2;
     taskspace_t lambda_d, lambda_n, lambda_err;
+
+    q_t joint_limits[5][2] = {
+        {JOINT1_MIN, JOINT1_MAX},
+        {JOINT2_MIN, JOINT2_MAX},
+        {JOINT3_MIN, JOINT3_MAX},
+        {JOINT4_MIN, JOINT4_MAX},
+        {JOINT5_MIN, JOINT5_MAX},
+    };
+
+    q << -2.00, -1.65, 2.30, -1.9, 0.0;
+    ROS_INFO("initial [q0] = [%f %f %f %f %f]", q[0], q[1], q[2], q[3], q[4]);
+
+    // Make sure each joint is within joint limits
+    for (int i = 0; i < 4; i++)
+    {
+        // Wrap to pi
+        while (q[i] > M_PI) q[i] -= 2*M_PI;
+        while (q[i] < -M_PI) q[i] += 2*M_PI;
+
+        // Make sure each joint is within joint limits
+        q[i] = (q[i] > joint_limits[i][MAX]) ? 
+                    joint_limits[i][MAX] : 
+                    (q[i] < joint_limits[i][MIN]) ?
+                        joint_limits[i][MIN] :
+                        q[i];
+    }
+
+    ROS_INFO("adjusted [q0] = [%f %f %f %f %f]", q[0], q[1], q[2], q[3], q[4]);
+
     
     lambda_n << calc_endaffector_position(curr_config);
     ROS_INFO("initial endaffector position: [%f %f %f]", lambda_n(0), lambda_n(1), lambda_n(2));
@@ -133,7 +192,7 @@ void virtual_ik()
     ROS_INFO("final [q] = [%f %f %f %f %f]", q[0], q[1], q[2], q[3], q[4]);
 }
 
-void test_arm(config_t q)
+void set_joints(config_t q)
 {
     ros::Rate r(0.25);
     joint_pos_out.name = "joint1";
@@ -174,7 +233,7 @@ void curr_config_recv_callback(const sensor_msgs::JointState& q_msg)
                     q_msg.position[JOINT4],
                     q_msg.position[JOINT5];
 
-    ROS_INFO("Current config space = [%f %f %f %f %f]", 
+    // ROS_INFO("Current config space = [%f %f %f %f %f]", 
         curr_config(0), curr_config(1), curr_config(2), curr_config(3), curr_config(4));
     config_recv = true;
     curr_config_sub.shutdown();
@@ -183,10 +242,10 @@ void curr_config_recv_callback(const sensor_msgs::JointState& q_msg)
 void desired_taskspace_recv_callback(const geometry_msgs::Vector3& lambda_d_msg)
 {
     taskspace_t lambda_d;
-    ROS_INFO("New desired taskspace received!");
+    // ROS_INFO("New desired taskspace received!");
     lambda_d << lambda_d_msg.x, lambda_d_msg.y, lambda_d_msg.z;
     curr_config << calc_jetarm_ik(lambda_d);
-    test_arm(curr_config);
+    set_joints(curr_config);
 }
 
 int main(int argc, char **argv)
@@ -195,15 +254,14 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "jetarm_ik");
 
     ros::NodeHandle nodeHandle;
-
+    
     curr_config_sub = nodeHandle.subscribe("/joint_states", 1, curr_config_recv_callback);
+    ROS_INFO("Waiting for config space reading...");
     while (!config_recv) ros::spinOnce();
-    
-    desired_taskspace_sub = nodeHandle.subscribe("arm_desired_task_space", 1, desired_taskspace_recv_callback);
-    
-    set_joint_pub = nodeHandle.advertise<hiwonder_interfaces::JointMove>("/controllers/set_joint", 1);
 
-    // virtual_ik();
+    ROS_INFO("Ready!"); 
+    set_joint_pub = nodeHandle.advertise<hiwonder_interfaces::JointMove>("/controllers/set_joint", 1);
+    desired_taskspace_sub = nodeHandle.subscribe("arm_desired_task_space", 1, desired_taskspace_recv_callback);
 
     while (ros::ok())
     {
