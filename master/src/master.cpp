@@ -1,6 +1,6 @@
 #include <ros/ros.h>  // This .h file must always be included in all ROS code
 // There must be a .h file for every message type used
-#include <std_msgs/UInt16.h>
+#include <std_msgs/UInt8.h>
 #include <string>
 #include <iostream>
 
@@ -25,16 +25,16 @@ enum ArmState : int
 };
 
 ros::Subscriber bot_state_sub;
-std_msgs::UInt16 bot_state_out;
 int bot_state = UNLOADING;
 
 ros::Publisher bot_state_pub;
+std_msgs::UInt8 bot_state_out;
 
 ros::Subscriber arm_state_sub;
-std_msgs::UInt16 arm_state_out;
 int arm_state = DROP_BLOCK;
 
 ros::Publisher arm_state_pub;
+std_msgs::UInt8 arm_state_out;
 
 int sequence[3];
 int curr_sequence_indx = 0;
@@ -79,13 +79,13 @@ void state_machine()
     }
 }
 
-void bot_state_callback(const std_msgs::UInt16& msg)
+void bot_state_callback(const std_msgs::UInt8& msg)
 {
     bot_state = msg.data;
     state_machine();
 }
 
-void arm_state_callback(const std_msgs::UInt16& msg)
+void arm_state_callback(const std_msgs::UInt8& msg)
 {
     arm_state = msg.data;
     state_machine();
@@ -141,13 +141,16 @@ int main(int argc, char **argv)
     subscriptions that this node talks to.*/
 
     bot_state_sub = nodeHandle.subscribe("bot_state", 1, bot_state_callback);
-    bot_state_pub = nodeHandle.advertise<std_msgs::UInt16>("bot_state", 1);
+    bot_state_pub = nodeHandle.advertise<std_msgs::UInt8>("bot_state", 1);
 
     arm_state_sub = nodeHandle.subscribe("arm_state", 1, arm_state_callback);
-    arm_state_pub = nodeHandle.advertise<std_msgs::UInt16>("arm_state", 1);
+    arm_state_pub = nodeHandle.advertise<std_msgs::UInt8>("arm_state", 1);
     
-    get_sequence();
-    ROS_INFO("Sequence: [%i %i %i]", sequence[0], sequence[1], sequence[2]);
+    // get_sequence();
+    // ROS_INFO("Sequence: [%i %i %i]", sequence[0], sequence[1], sequence[2]);
+    sequence[0] = 1;
+    sequence[1] = 2;
+    sequence[2] = 3;
     
     arm_state_out.data = sequence[curr_sequence_indx++];
     arm_state_pub.publish(arm_state_out);

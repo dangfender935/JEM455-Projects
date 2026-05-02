@@ -6,61 +6,93 @@ std_msgs::UInt8 pose_request{};
 ros::Publisher pose_controller_pub;
 geometry_msgs::Vector3 desired_pose;
 
-std::string json_path; 
-std::vector<Pose> pose_list; 
-int vec_index = 0;
+ros::Publisher bot_state_pub;
+std_msgs::UInt8 bot_state_out;
 
-enum PoseRequest
+std::string pickup_json_path; 
+std::string dropoff_json_path; 
+
+std::vector<Pose> pickup_pose_list; 
+std::vector<Pose> dropoff_pose_list; 
+
+
+void pose_request_recv_callback(const std_msgs::UInt8& pose_request)
 {
-    RELOAD = 0,
-    NEXT_POSE = 1
-};
+    std::vector<Pose>* pose_list;
+    int next_state;
+    static int vec_index = 0;
 
-
-void pose_request_recv_callback(const std_msgs::UInt8& msg)
-{
-    pose_request = msg;
     switch (pose_request.data)
     {
     case RELOAD:
-        loadPoses(json_path, pose_list);
+        loadPoses(pickup_json_path, pickup_pose_list);
+        loadPoses(dropoff_json_path, dropoff_pose_list);
         vec_index = 0;
+        // break;
+        return;
+
+    case NEXT_PICKUP_POSE:
+        if (vec_index < pose_list->size())
+        {
+            Pose curr_pose = pose_list->at(vec_index++);
+            desired_pose.x = curr_pose.x;
+            desired_pose.y = curr_pose.y;
+            desired_pose.z = curr_pose.theta;
+            pose_controller_pub.publish(desired_pose);
+        }
+        pose_list = &pickup_pose_list;
+        next_state = READY_TO_RECEIVE_BLOCK;
+        // vec_index++;
         break;
-    case NEXT_POSE:
-        vec_index++;
+
+    case NEXT_DROPOFF_POSE:
+        pose_list = &dropoff_pose_list;
+        next_state = UNLOADING;
+        // vec_index++;
         break;
+
     default:
         break;
     }
-    if (vec_index < pose_list.size())
+
+    if (vec_index < pose_list->size())
     {
-        Pose curr_pose = pose_list.at(vec_index);
+        Pose curr_pose = pose_list->at(vec_index++);
         desired_pose.x = curr_pose.x;
         desired_pose.y = curr_pose.y;
         desired_pose.z = curr_pose.theta;
         pose_controller_pub.publish(desired_pose);
     }
-    
+    else
+    {
+        bot_state_out.data = next_state;
+        // bot_state_pub.publish(bot_state_out);
+        vec_index = 0;
+    }
 }
 
 int main(int argc, char **argv) {
-    ros::init(argc, argv, "pose_checkpoint"); // Create the "master" node
-    ros::NodeHandle n; // Create the node handle object
+    ros::init(argc, argv, "pose_checkpoint");
+    ros::NodeHandle nodeHandle; // Create the node handle object
 
-    pose_request_sub = n.subscribe("pose_request", 1, pose_request_recv_callback);
-    pose_controller_pub = n.advertise<geometry_msgs::Vector3>("pose_controller_global", 1);
+    pose_request_sub = nodeHandle.subscribe("pose_request", 1, pose_request_recv_callback);
+    pose_controller_pub = nodeHandle.advertise<geometry_msgs::Vector3>("pose_controller_global", 1);
+
+    // bot_state_pub = nodeHandle.advertise<std_msgs::UInt8>("bot_state", 1);
 
     // Load the argument that gives the name of the json file
-    n.getParam("/pose_checkpoint/json_file", json_path);
-    ROS_INFO("Name of the json file is: %s", json_path.c_str());
+    nodeHandle.getParam("/pose_checkpoint/SHC_to_Cementation_checkpoints", pickup_json_path);
+    nodeHandle.getParam("/pose_checkpoint/Cementation_to_SHC_checkpoints", dropoff_json_path);
+    // ROS_INFO("Name of the json file is: %s", json_path.c_str());
 
     // Load the list of poses from the json file
-    loadPoses(json_path, pose_list);
+    loadPoses(pickup_json_path, pickup_pose_list);
+    loadPoses(dropoff_json_path, dropoff_pose_list);
 
     // Print out all poses loaded from the JSON file
-    for (int i = 0; i < pose_list.size(); i++) {
-    	ROS_INFO("Pose %d: x=%.2f, y=%.2f, theta=%.2f", i, pose_list[i].x, pose_list[i].y, pose_list[i].theta); 
-    }
+    // for (int i = 0; i < pose_list.size(); i++) {
+    // 	ROS_INFO("Pose %d: x=%.2f, y=%.2f, theta=%.2f", i, pose_list[i].x, pose_list[i].y, pose_list[i].theta); 
+    // }
 
     while (ros::ok()) // The ros::ok() function returns true as long as ROS is running
     {

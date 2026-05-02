@@ -31,7 +31,16 @@ typedef enum MoveState
 enum PoseRequest
 {
     RELOAD = 0,
-    NEXT_POSE = 1
+    NEXT_PICKUP_POSE = 1,
+	NEXT_DROPOFF_POSE = 2
+};
+
+enum BotState : int
+{
+    UNLOADING = 0,
+    MOVING_TO_PICKUP = 1,
+    READY_TO_RECEIVE_BLOCK = 2,
+    TRANSPORTING_BLOCK = 3
 };
 
 ros::Subscriber desired_pose_sub;
@@ -48,6 +57,10 @@ geometry_msgs::Vector3 vel_out{};
 
 ros::Publisher pose_request_pub;
 std_msgs::UInt8 pose_request{};
+
+ros::Subscriber bot_state_sub;
+int bot_state;
+
 
 float desired_global_x = 0.f;
 float desired_global_y = 0.f;
@@ -77,6 +90,31 @@ inline float normalize_angle(float angle)
     return angle;
 }
 
+void request_next_pose()
+{
+    switch (bot_state)
+    {
+    case MOVING_TO_PICKUP:
+        pose_request.data = NEXT_PICKUP_POSE;
+        pose_request_pub.publish(pose_request);
+        break;
+
+    case TRANSPORTING_BLOCK:
+        pose_request.data = NEXT_DROPOFF_POSE;
+        pose_request_pub.publish(pose_request);
+        break;
+
+    default:
+        return;
+    }
+}
+
+void bot_state_callback(const std_msgs::UInt8& msg)
+{
+    bot_state = msg.data;
+    request_next_pose();
+}
+
 void curr_pose_recv_callback(const pose_est::pose_est_msg& msg)
 {
     // The bot will actually try to fix direction error first if paused in the middle of correcting orientation
@@ -90,6 +128,7 @@ void curr_pose_recv_callback(const pose_est::pose_est_msg& msg)
     float xspeed = 0.f;
     static float last_rho;
     curr_pose = msg.point;
+
     switch (move_state)
     {
     case CORRECT_DIRECTION_ERROR:
@@ -160,8 +199,7 @@ void curr_pose_recv_callback(const pose_est::pose_est_msg& msg)
             ROS_INFO("======================================================================");
             ROS_INFO("============================= Arrived!!! =============================");
             ROS_INFO("======================================================================");
-            pose_request.data = NEXT_POSE;
-            pose_request_pub.publish(pose_request);
+            request_next_pose();
         }
         else
         {
@@ -214,13 +252,14 @@ int main(int argc, char **argv)
     keydown_sub = nodeHandle.subscribe("keyboard/keydown", 1, keydown_recv_callback);
     local_vel_pub = nodeHandle.advertise<geometry_msgs::Vector3>("local_velocities", 1);
     pose_request_pub = nodeHandle.advertise<std_msgs::UInt8>("pose_request", 1);
+    bot_state_sub = nodeHandle.subscribe("bot_state", 1, bot_state_callback);
     pose_request.data = RELOAD;
     move_state = STOP;
-    while (move_state == STOP)
-    {
-        ros::spinOnce();
-        pose_request_pub.publish(pose_request);
-    }
+    // while (move_state == STOP)
+    // {
+    //     ros::spinOnce();
+    //     pose_request_pub.publish(pose_request);
+    // }
 
     while (ros::ok())
     {

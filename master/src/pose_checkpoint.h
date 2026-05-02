@@ -13,4 +13,19 @@ struct Pose {
 	double theta;
 };
 
+enum PoseRequest
+{
+    RELOAD = 0,
+    NEXT_PICKUP_POSE = 1,
+	NEXT_DROPOFF_POSE = 2
+};
+
+enum BotState : int
+{
+    UNLOADING = 0,
+    MOVING_TO_PICKUP = 1,
+    READY_TO_RECEIVE_BLOCK = 2,
+    TRANSPORTING_BLOCK = 3
+};
+
 void loadPoses(const std::string& file_path, std::vector<Pose>& poses);
