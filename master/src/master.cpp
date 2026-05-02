@@ -1,154 +1,163 @@
 #include <ros/ros.h>  // This .h file must always be included in all ROS code
 // There must be a .h file for every message type used
-#include <std_msgs/Float64.h> // This is type std_msgs/Float64 which is a standard 64 bit floating point number
 #include <std_msgs/UInt16.h>
-#include <geometry_msgs/Vector3.h>
-#include <keyboard/Key.h> // This is where the keyboard/Key message type is defined
+#include <string>
+#include <iostream>
 
-#define Q_KEY           (113)
-#define W_KEY           (119)
-#define A_KEY           (97)
-#define S_KEY           (115)
-#define D_KEY           (100)
-#define E_KEY           (101)
-#define Z_KEY           (122)
-#define X_KEY           (120)
-#define C_KEY           (99)
-#define LINEAR_SPEED    (2)
-#define ANGULAR_SPEED   (2)
+#define SECONDS_TO_WAIT         (3)
 
-// Global variables
-keyboard::Key message_in; // This will hold the message from the topic we subscribe to
-// std_msgs::UInt16 message_out;
-geometry_msgs::Vector3 message_out;
-ros::Publisher my_publisher_object;
-ros::Subscriber keydown_in;
-ros::Subscriber keyup_in;
-ros::Time last_key_time;
-
-
-/* This is our callback function that is called when something is published to the keyboard/keydown
-topic. Callback functions take in 1 parameter that is an object of the message type that topic 
-receives. Callback functions always return void, so we will store this data in our global variable
-so we can use it in other functions.*/
-void keydown_callback(const keyboard::Key& msg)
+enum BotState : int
 {
-    message_in = msg; // Store the data from this topic into our global variable
-    // ROS_INFO("Key pressed has code: %d",message_in.code);
-    /* This is how we do print statements in
-    ROS. Here we are just printing the code for the key that was pressed.*/
-    switch (message_in.code)
+    UNLOADING = 0,
+    MOVING_TO_PICKUP = 1,
+    READY_TO_RECEIVE_BLOCK = 2,
+    TRANSPORTING_BLOCK = 3
+};
+
+enum ArmState : int
+{
+    DROP_BLOCK = 0,
+    PICKUP_BLOCK1 = 1,
+    PICKUP_BLOCK2 = 2,
+    PICKUP_BLOCK3 = 3,
+    READY_TO_DROP = 4,
+    HAS_DROPPED = 5
+};
+
+ros::Subscriber bot_state_sub;
+std_msgs::UInt16 bot_state_out;
+int bot_state = UNLOADING;
+
+ros::Publisher bot_state_pub;
+
+ros::Subscriber arm_state_sub;
+std_msgs::UInt16 arm_state_out;
+int arm_state = DROP_BLOCK;
+
+ros::Publisher arm_state_pub;
+
+int sequence[3];
+int curr_sequence_indx = 0;
+
+void state_machine()
+{
+    static int blocks_delivered = 0;
+    if (bot_state == READY_TO_RECEIVE_BLOCK)
     {
-    case W_KEY:
-        message_out.x += LINEAR_SPEED;
-        // message_out.z = 0;
-        break;
+        switch (arm_state)
+        {
+            case READY_TO_DROP:
+                arm_state_out.data = DROP_BLOCK;
+                arm_state_pub.publish(arm_state_out);
+                break;
 
-    case A_KEY:
-        // message_out.x = 0;
-        message_out.z += ANGULAR_SPEED;
-        break;
+            case HAS_DROPPED:
+                bot_state_out.data = TRANSPORTING_BLOCK;
+                bot_state_pub.publish(bot_state_out);
+                if (blocks_delivered < 2)
+                {
+                    arm_state_out.data = sequence[blocks_delivered + 1];
+                    arm_state_pub.publish(arm_state_out);
+                }
+                break;
 
-    case S_KEY:
-        message_out.x += -LINEAR_SPEED;
-        // message_out.z = 0;
-        break;
-
-    case D_KEY:
-        // message_out.x = 0;
-        message_out.z += -ANGULAR_SPEED;
-        break;
-
-    default:
-        message_out.x = 0;
-        message_out.z = 0;
-        break;
-    
+            default:
+                break;
+        }
+        return;
     }
-    my_publisher_object.publish(message_out);
-    // last_key_time = ros::Time::now();
 
+    if (bot_state == UNLOADING)
+    {
+        ros::Duration(SECONDS_TO_WAIT).sleep();
+        blocks_delivered++;
+        if (blocks_delivered < 3)
+        {
+            bot_state_out.data = MOVING_TO_PICKUP;
+            bot_state_pub.publish(bot_state_out);
+        }
+    }
 }
 
-void keyup_callback(const keyboard::Key& msg)
+void bot_state_callback(const std_msgs::UInt16& msg)
 {
-    // ROS_INFO("Key released has code: %d", msg.code);
-    int key = msg.code;
-    switch (key)
+    bot_state = msg.data;
+    state_machine();
+}
+
+void arm_state_callback(const std_msgs::UInt16& msg)
+{
+    arm_state = msg.data;
+    state_machine();
+}
+
+void get_sequence()
+{
+    int sequence_indx;
+    std::string sequence_string;
+    while (true)
     {
-    case W_KEY:
-        message_out.x -= LINEAR_SPEED;
-        // message_out.z = 0;
-        break;
+        ROS_INFO("Enter your three number sequence: ");
+        std::getline(std::cin, sequence_string);
+        sequence_indx = 0;
+        for (int i = 0; i < sequence_string.length(); i++)
+        {
+            switch (sequence_string.at(i))
+            {
+                case '1':
+                    sequence[sequence_indx++] = 1;
+                    break;
 
-    case A_KEY:
-        // message_out.x = 0;
-        message_out.z -= ANGULAR_SPEED;
-        break;
+                case '2':
+                    sequence[sequence_indx++] = 2;
+                    break;
 
-    case S_KEY:
-        message_out.x -= -LINEAR_SPEED;
-        // message_out.z = 0;
-        break;
+                case '3':
+                    sequence[sequence_indx++] = 3;
+                    break;
+                
+                default:
+                    continue;
+            }
+            if (sequence_indx >= 3) break;
+        }
 
-    case D_KEY:
-        // message_out.x = 0;
-        message_out.z -= -ANGULAR_SPEED;
+        if ((sequence[0] == sequence[1]) || (sequence[0] == sequence[2]) || (sequence[1] == sequence[2]) 
+            || (sequence_indx < 2))
+        {
+            ROS_INFO("Invalid Sequence!");
+            continue;
+        }
         break;
-
-    default:
-        message_out.x = 0;
-        message_out.z = 0;
-        break;
-    
     }
-    my_publisher_object.publish(message_out);
-    // message_in.code = 0;
-
 }
 
 int main(int argc, char **argv) 
 {
-    message_out.y = 0;
-
     ros::init(argc, argv, "master"); /* This is how you create a node. The only thing that
     changes for this function is the string argument which indicates the name of the node.*/
-    ros::NodeHandle n; /* This creates something called an object that is used in object-
+    ros::NodeHandle nodeHandle; /* This creates something called an object that is used in object-
     oriented programming. This object is responsible for handling the publications and 
     subscriptions that this node talks to.*/
 
-    my_publisher_object = n.advertise<geometry_msgs::Vector3>("local_velocities", 1);
-    /* This creates a publisher object. This is done by calling the function n.advertise which
-    is a function tied to the object that we created earlier. The <> brackets indicate what
-    message type is going to be used for this topic. The first argument is the name of the 
-    topic. The "1" argument says to use a buffer size of 1; could make larger, if expect network 
-    backups */
+    bot_state_sub = nodeHandle.subscribe("bot_state", 1, bot_state_callback);
+    bot_state_pub = nodeHandle.advertise<std_msgs::UInt16>("bot_state", 1);
 
-    keydown_in = n.subscribe("/keyboard/keydown", 1, keydown_callback);
-    /* This creates a subscriber object. This is done by calling the function n.subscribe which
-    is also a function tied to the object of class ros::NodeHandle. The first argument is the 
-    name of the topic that you want to subscribe to. The second argument is the buffer size which
-    we will just set to 1. The third argument is the callback function that gets called when data
-    is published to this topic. This works like an interupt.*/
-    keyup_in = n.subscribe("/keyboard/keyup", 1, keyup_callback);
+    arm_state_sub = nodeHandle.subscribe("arm_state", 1, arm_state_callback);
+    arm_state_pub = nodeHandle.advertise<std_msgs::UInt16>("arm_state", 1);
+    
+    get_sequence();
+    ROS_INFO("Sequence: [%i %i %i]", sequence[0], sequence[1], sequence[2]);
+    
+    arm_state_out.data = sequence[curr_sequence_indx++];
+    arm_state_pub.publish(arm_state_out);
+
+    bot_state_out.data = MOVING_TO_PICKUP;
+    bot_state_pub.publish(bot_state_out);
 
     while (ros::ok()) // The ros::ok() function returns true as long as ROS is running
     {
-        // input_float.data = input_float.data + 0.001; //increment by 0.001 each iteration
-
-        // my_publisher_object.publish(input_float); /* This is the function that we call to publish
-        // the data in the input_float object. Note that we use the my_publisher_object to call the 
-        // function.*/
-
-        // if (message_in.code == Q_KEY)
-        // {
-        //     message_out.data += 1;
-        //     my_publisher_object.publish(message_out);
-        //     message_in.code = 114;
-        // }
-
-        
-	    ros::spinOnce(); // This function checks for anything published to a topic we subscribe to
+        ros::spinOnce(); // This function checks for anything published to a topic we subscribe to
     }
 
 }
