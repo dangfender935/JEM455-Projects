@@ -18,8 +18,7 @@ std::vector<Pose> dropoff_pose_list;
 
 void pose_request_recv_callback(const std_msgs::UInt8& pose_request)
 {
-    std::vector<Pose>* pose_list;
-    int next_state;
+    Pose curr_pose;
     static int vec_index = 0;
 
     switch (pose_request.data)
@@ -32,42 +31,41 @@ void pose_request_recv_callback(const std_msgs::UInt8& pose_request)
         return;
 
     case NEXT_PICKUP_POSE:
-        if (vec_index < pose_list->size())
+        if (vec_index < pickup_pose_list.size())
         {
-            Pose curr_pose = pose_list->at(vec_index++);
+            curr_pose = pickup_pose_list.at(vec_index++);
             desired_pose.x = curr_pose.x;
             desired_pose.y = curr_pose.y;
             desired_pose.z = curr_pose.theta;
             pose_controller_pub.publish(desired_pose);
         }
-        pose_list = &pickup_pose_list;
-        next_state = READY_TO_RECEIVE_BLOCK;
-        // vec_index++;
+        else
+        {
+            bot_state_out.data = READY_TO_RECEIVE_BLOCK;
+            bot_state_pub.publish(bot_state_out);
+            vec_index = 0;
+        }
         break;
 
     case NEXT_DROPOFF_POSE:
-        pose_list = &dropoff_pose_list;
-        next_state = UNLOADING;
-        // vec_index++;
+        if (vec_index < dropoff_pose_list.size())
+        {
+            curr_pose = dropoff_pose_list.at(vec_index++);
+            desired_pose.x = curr_pose.x;
+            desired_pose.y = curr_pose.y;
+            desired_pose.z = curr_pose.theta;
+            pose_controller_pub.publish(desired_pose);
+        }
+        else
+        {
+            bot_state_out.data = UNLOADING;
+            bot_state_pub.publish(bot_state_out);
+            vec_index = 0;
+        }
         break;
 
     default:
         break;
-    }
-
-    if (vec_index < pose_list->size())
-    {
-        Pose curr_pose = pose_list->at(vec_index++);
-        desired_pose.x = curr_pose.x;
-        desired_pose.y = curr_pose.y;
-        desired_pose.z = curr_pose.theta;
-        pose_controller_pub.publish(desired_pose);
-    }
-    else
-    {
-        bot_state_out.data = next_state;
-        // bot_state_pub.publish(bot_state_out);
-        vec_index = 0;
     }
 }
 
@@ -78,11 +76,11 @@ int main(int argc, char **argv) {
     pose_request_sub = nodeHandle.subscribe("pose_request", 1, pose_request_recv_callback);
     pose_controller_pub = nodeHandle.advertise<geometry_msgs::Vector3>("pose_controller_global", 1);
 
-    // bot_state_pub = nodeHandle.advertise<std_msgs::UInt8>("bot_state", 1);
+    bot_state_pub = nodeHandle.advertise<std_msgs::UInt8>("bot_state", 1);
 
     // Load the argument that gives the name of the json file
-    nodeHandle.getParam("/pose_checkpoint/SHC_to_Cementation_checkpoints", pickup_json_path);
-    nodeHandle.getParam("/pose_checkpoint/Cementation_to_SHC_checkpoints", dropoff_json_path);
+    nodeHandle.getParam("/pose_checkpoint/SHC2C", pickup_json_path);
+    nodeHandle.getParam("/pose_checkpoint/C2SHC", dropoff_json_path);
     // ROS_INFO("Name of the json file is: %s", json_path.c_str());
 
     // Load the list of poses from the json file

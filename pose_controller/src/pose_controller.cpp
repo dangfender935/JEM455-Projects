@@ -95,6 +95,7 @@ void request_next_pose()
     switch (bot_state)
     {
     case MOVING_TO_PICKUP:
+        ROS_INFO("Requesting next pose...");
         pose_request.data = NEXT_PICKUP_POSE;
         pose_request_pub.publish(pose_request);
         break;

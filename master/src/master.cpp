@@ -25,13 +25,13 @@ enum ArmState : int
 };
 
 ros::Subscriber bot_state_sub;
-int bot_state = UNLOADING;
+int bot_state = -1;
 
 ros::Publisher bot_state_pub;
 std_msgs::UInt8 bot_state_out;
 
 ros::Subscriber arm_state_sub;
-int arm_state = DROP_BLOCK;
+int arm_state = -1;
 
 ros::Publisher arm_state_pub;
 std_msgs::UInt8 arm_state_out;
@@ -56,8 +56,13 @@ void state_machine()
                 bot_state_pub.publish(bot_state_out);
                 if (blocks_delivered < 2)
                 {
+                    ROS_INFO("Blocks Delivered = %i", blocks_delivered);
                     arm_state_out.data = sequence[blocks_delivered + 1];
                     arm_state_pub.publish(arm_state_out);
+                }
+                else
+                {
+                    arm_state = DROP_BLOCK;
                 }
                 break;
 
@@ -69,9 +74,9 @@ void state_machine()
 
     if (bot_state == UNLOADING)
     {
+        ROS_INFO("Delivering a block!");
         ros::Duration(SECONDS_TO_WAIT).sleep();
-        blocks_delivered++;
-        if (blocks_delivered < 3)
+        if (++blocks_delivered < 3)
         {
             bot_state_out.data = MOVING_TO_PICKUP;
             bot_state_pub.publish(bot_state_out);
@@ -151,10 +156,14 @@ int main(int argc, char **argv)
     sequence[0] = 1;
     sequence[1] = 2;
     sequence[2] = 3;
+
+    ros::Duration(SECONDS_TO_WAIT).sleep();
+
     
     arm_state_out.data = sequence[curr_sequence_indx++];
     arm_state_pub.publish(arm_state_out);
 
+    ROS_INFO("Publishing to bot state...");
     bot_state_out.data = MOVING_TO_PICKUP;
     bot_state_pub.publish(bot_state_out);
 
