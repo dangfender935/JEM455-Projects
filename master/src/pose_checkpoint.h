@@ -34,8 +34,9 @@ enum ArmState : int
     PICKUP_BLOCK1 = 1,
     PICKUP_BLOCK2 = 2,
     PICKUP_BLOCK3 = 3,
-    READY_TO_DROP = 4,
-    HAS_DROPPED = 5
+    MOVING_TO_DROP = 4,
+    READY_TO_DROP = 5,
+    HAS_DROPPED = 6
 };
 
 void loadPoses(const std::string& file_path, std::vector<Pose>& poses);

@@ -1,25 +1,34 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Vector3.h>
 #include <std_msgs/UInt8.h>
-#include <sensor_msgs/JointState.h>
 #include "pose_checkpoint.h"
 #include <math.h>
 #include <vector>
 #include <string>
 
-#define BLOCK1      (0)
-#define BLOCK2      (1)
-#define BLOCK3      (2)
-#define BLOCK_DROP  (3)
+#define BLOCK1                  (0)
+#define BLOCK2                  (1)
+#define BLOCK3                  (2)
+#define BLOCK_DROP              (3)
 
-#define ERROR_THRESHOLD     (0.005)
+#define ERROR_THRESHOLD         (0.005)
 
-#define SECONDS_TO_WAIT     (1)
+#define GRIPPER_OPEN_TIME       (1)
+#define GRIPPER_CLOSE_TIME      (1)
+
+enum GripperState : int
+{
+    OPEN = 0,
+    CLOSE = 1
+};
 
 ros::Subscriber arm_state_sub;
 
 ros::Publisher arm_state_pub;
 std_msgs::UInt8 arm_state_out;
+
+ros::Publisher gripper_state_pub;
+std_msgs::UInt8 gripper_state_out;
 
 ros::Subscriber task_space_sub;
 
@@ -38,8 +47,9 @@ void arm_state_callback(const std_msgs::UInt8& state)
     switch (arm_state)
     {
     case DROP_BLOCK:
-        // code to drop block here
-        ros::Duration(SECONDS_TO_WAIT).sleep();
+        gripper_state_out.data = OPEN;
+        gripper_state_pub.publish(gripper_state_out);
+        ros::Duration(GRIPPER_OPEN_TIME).sleep();
         arm_state_out.data = HAS_DROPPED;
         arm_state_pub.publish(arm_state_out);
         break;
@@ -50,6 +60,8 @@ void arm_state_callback(const std_msgs::UInt8& state)
         task_space_out.y = taskspaces[BLOCK1].y;
         task_space_out.z = taskspaces[BLOCK1].theta;
         task_space_pub.publish(task_space_out);
+        gripper_state_out.data = OPEN;
+        gripper_state_pub.publish(gripper_state_out);
         break;
 
     case PICKUP_BLOCK2:
@@ -65,6 +77,14 @@ void arm_state_callback(const std_msgs::UInt8& state)
         task_space_out.x = taskspaces[BLOCK3].x;
         task_space_out.y = taskspaces[BLOCK3].y;
         task_space_out.z = taskspaces[BLOCK3].theta;
+        task_space_pub.publish(task_space_out);
+        break;
+
+    case MOVING_TO_DROP:
+        desired_pose = taskspaces[BLOCK_DROP];
+        task_space_out.x = desired_pose.x;
+        task_space_out.y = desired_pose.y;
+        task_space_out.z = desired_pose.theta;
         task_space_pub.publish(task_space_out);
         break;
 
@@ -84,7 +104,21 @@ void task_space_callback(const geometry_msgs::Vector3& msg)
             (abs(msg.y - desired_pose.y) < ERROR_THRESHOLD) &&
             (abs(msg.z - desired_pose.theta) < ERROR_THRESHOLD))
         {
-            // code to grab block here
+            gripper_state_out.data = CLOSE;
+            gripper_state_pub.publish(gripper_state_out);
+            ros::Duration(GRIPPER_CLOSE_TIME).sleep();
+            arm_state_out.data = MOVING_TO_DROP;
+            arm_state_pub.publish(arm_state_out);
+        };
+        break;
+
+    case MOVING_TO_DROP:
+        if ((abs(msg.x - desired_pose.x) < ERROR_THRESHOLD) &&
+            (abs(msg.y - desired_pose.y) < ERROR_THRESHOLD) &&
+            (abs(msg.z - desired_pose.theta) < ERROR_THRESHOLD))
+        {
+            arm_state_out.data = READY_TO_DROP;
+            arm_state_pub.publish(arm_state_out);
         };
         break;
 
@@ -106,12 +140,19 @@ int main(int argc, char **argv)
     arm_state_sub = nodeHandle.subscribe("arm_state", 1, arm_state_callback);
     arm_state_pub = nodeHandle.advertise<std_msgs::UInt8>("arm_state", 1);
 
+    gripper_state_pub = nodeHandle.advertise<std_msgs::UInt8>("gripper_state", 1);
+
     task_space_sub = nodeHandle.subscribe("arm_task_space", 1, task_space_callback);
     task_space_pub = nodeHandle.advertise<geometry_msgs::Vector3>("arm_desired_task_space", 1);
 
     nodeHandle.getParam("/arm_manager/arm_taskspaces", json_path);
     
     loadPoses(json_path, taskspaces);
+
+    ros::Duration(3).sleep();
+
+    gripper_state_out.data = OPEN;
+    gripper_state_pub.publish(gripper_state_out);
 
     while (ros::ok()) // The ros::ok() function returns true as long as ROS is running
     {

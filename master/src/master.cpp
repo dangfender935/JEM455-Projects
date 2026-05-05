@@ -5,7 +5,7 @@
 #include <iostream>
 #include "pose_checkpoint.h"
 
-#define SECONDS_TO_WAIT         (3)
+#define GRIPPER_OPEN_TIME         (3)
 
 
 
@@ -60,7 +60,7 @@ void state_machine()
     if (bot_state == UNLOADING)
     {
         ROS_INFO("Delivering a block!");
-        ros::Duration(SECONDS_TO_WAIT).sleep();
+        ros::Duration(GRIPPER_OPEN_TIME).sleep();
         if (++blocks_delivered < 3)
         {
             bot_state_out.data = MOVING_TO_PICKUP;
@@ -142,7 +142,7 @@ int main(int argc, char **argv)
     sequence[1] = 2;
     sequence[2] = 3;
 
-    ros::Duration(SECONDS_TO_WAIT).sleep();
+    ros::Duration(GRIPPER_OPEN_TIME).sleep();
 
     
     arm_state_out.data = sequence[curr_sequence_indx++];
