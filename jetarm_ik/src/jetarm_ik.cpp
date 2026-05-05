@@ -269,6 +269,7 @@ void jac_recv_callback(const std_msgs::Float32MultiArray& msg)
 {
     config_t q;
     jac_t J;
+    lambda_t lambda;
     for (const auto& value: msg.data)
     {
         ROS_INFO("Value = %f", value);
@@ -278,6 +279,10 @@ void jac_recv_callback(const std_msgs::Float32MultiArray& msg)
         msg.data[2], 
         msg.data[3],
         msg.data[4];
+
+    lambda << calc_endaffector_position(q);
+    ROS_INFO("[lambda] = [%f %f %f %f %f]", lambda(0), lambda(1), lambda(2), lambda(3), lambda(4));
+    ROS_INFO("");
 
     J << jacobian(q);
     ROS_INFO("[J] = [%f %f %f %f %f]", J(0, 0), J(0, 1), J(0, 2), J(0, 3), J(0, 4));
