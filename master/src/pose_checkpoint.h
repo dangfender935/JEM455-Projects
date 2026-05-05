@@ -28,4 +28,14 @@ enum BotState : int
     TRANSPORTING_BLOCK = 3
 };
 
+enum ArmState : int
+{
+    DROP_BLOCK = 0,
+    PICKUP_BLOCK1 = 1,
+    PICKUP_BLOCK2 = 2,
+    PICKUP_BLOCK3 = 3,
+    READY_TO_DROP = 4,
+    HAS_DROPPED = 5
+};
+
 void loadPoses(const std::string& file_path, std::vector<Pose>& poses);

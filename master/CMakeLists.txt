@@ -136,6 +136,8 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(master src/master.cpp)
 add_executable(pose_checkpoint src/pose_checkpoint.cpp)
+add_executable(arm_manager src/arm_manager.cpp)
+
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -153,6 +155,10 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 target_link_libraries(pose_checkpoint
+  ${catkin_LIBRARIES}
+)
+
+target_link_libraries(arm_manager
   ${catkin_LIBRARIES}
 )
 
