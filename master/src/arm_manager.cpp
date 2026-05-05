@@ -60,8 +60,6 @@ void arm_state_callback(const std_msgs::UInt8& state)
         task_space_out.y = taskspaces[BLOCK1].y;
         task_space_out.z = taskspaces[BLOCK1].theta;
         task_space_pub.publish(task_space_out);
-        gripper_state_out.data = OPEN;
-        gripper_state_pub.publish(gripper_state_out);
         break;
 
     case PICKUP_BLOCK2:
@@ -149,7 +147,7 @@ int main(int argc, char **argv)
     
     loadPoses(json_path, taskspaces);
 
-    ros::Duration(3).sleep();
+    ros::Duration(1).sleep();
 
     gripper_state_out.data = OPEN;
     gripper_state_pub.publish(gripper_state_out);
