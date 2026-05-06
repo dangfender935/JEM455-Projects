@@ -5,9 +5,9 @@
 #include <iostream>
 #include "pose_checkpoint.h"
 
-#define GRIPPER_OPEN_TIME         (3)
+#define GRIPPER_OPEN_TIME           (3)
 
-
+#define ARMLESS                     (1)
 
 ros::Subscriber bot_state_sub;
 int bot_state = -1;
@@ -29,6 +29,10 @@ void state_machine()
     static int blocks_delivered = 0;
     if (bot_state == READY_TO_RECEIVE_BLOCK)
     {
+#if ARMLESS
+        arm_state = HAS_DROPPED;
+#endif
+        
         switch (arm_state)
         {
             case READY_TO_DROP:
@@ -41,9 +45,10 @@ void state_machine()
                 bot_state_pub.publish(bot_state_out);
                 if (blocks_delivered < 2)
                 {
-                    ROS_INFO("Blocks Delivered = %i", blocks_delivered);
+#if (ARMLESS==0)
                     arm_state_out.data = sequence[blocks_delivered + 1];
                     arm_state_pub.publish(arm_state_out);
+#endif
                 }
                 else
                 {
@@ -136,11 +141,11 @@ int main(int argc, char **argv)
     arm_state_sub = nodeHandle.subscribe("arm_state", 1, arm_state_callback);
     arm_state_pub = nodeHandle.advertise<std_msgs::UInt8>("arm_state", 1);
     
-    // get_sequence();
-    // ROS_INFO("Sequence: [%i %i %i]", sequence[0], sequence[1], sequence[2]);
-    sequence[0] = 1;
-    sequence[1] = 2;
-    sequence[2] = 3;
+    get_sequence();
+    ROS_INFO("Sequence: [%i %i %i]", sequence[0], sequence[1], sequence[2]);
+    // sequence[0] = 1;
+    // sequence[1] = 2;
+    // sequence[2] = 3;
 
     ros::Duration(GRIPPER_OPEN_TIME).sleep();
 
