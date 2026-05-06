@@ -139,10 +139,10 @@ config_t calc_jetarm_ik(lambda_t lambda_d)
     {
         curr_lambda << calc_endaffector_position(q);
         lambda_error << lambda_d - curr_lambda;
-        constrained_error << lambda_error(1),
+        constrained_error << lambda_error(0),
+                            lambda_error(1),
                             lambda_error(2),
-                            lambda_error(3),
-                            lambda_error(4);
+                            lambda_error(3);
         if (constrained_error.norm() <= error_threshold)
             {break;}
         J << jacobian(q);
@@ -193,6 +193,10 @@ config_t calc_jetarm_ik(lambda_t lambda_d)
             break;
         }
         q(4) = q(4) - K2*yye_error;
+        q(4) = (q(4) > joint_limits[4][MAX]) ? joint_limits[JOINT5][MAX]
+                : q(4);
+        q(4) = (q(4) < joint_limits[JOINT5][MIN]) ? joint_limits[JOINT5][MIN]   
+                : q(4);
     }
 
     return q;
@@ -322,8 +326,6 @@ int main(int argc, char **argv)
     desired_taskspace_sub = nodeHandle.subscribe("arm_desired_task_space", 1, desired_taskspace_recv_callback);
 
     jac_sub = nodeHandle.subscribe("jac_test", 1, jac_recv_callback);
-
-    
 
     while (ros::ok())
     {
